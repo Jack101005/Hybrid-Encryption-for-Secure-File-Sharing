@@ -1,0 +1,2 @@
+Day la file mau de test ma hoa/giai ma.
+Hybrid encryption: AES-256-GCM + RSA-OAEP.
