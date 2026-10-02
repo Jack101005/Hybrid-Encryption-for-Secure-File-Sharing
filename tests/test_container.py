@@ -6,7 +6,8 @@ from hybridcrypto import container
 
 @pytest.mark.skip(reason="chưa implement")
 def test_pack_unpack_roundtrip():
-    wrapped, nonce, ct = b"W" * 384, b"N" * 12, b"cipher+tag"
+    # real AES GCM output is always at least 16 bytes (the tag), so use 32
+    wrapped, nonce, ct = b"W" * 384, b"N" * 12, b"c" * 32
     blob = container.pack(wrapped, nonce, ct)
     c = container.unpack(blob)
     assert (c.wrapped_key, c.nonce, c.ciphertext) == (wrapped, nonce, ct)

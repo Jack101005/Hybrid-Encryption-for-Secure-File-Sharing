@@ -1,43 +1,45 @@
 """AES-256-GCM authenticated encryption.
 
-[Mảng: Crypto core]
+Owner: Khoi (crypto core)
 
-Gợi ý implement: dùng ``cryptography.hazmat.primitives.ciphers.aead.AESGCM``.
-Lưu ý: với AESGCM của thư viện này, hàm encrypt trả về ciphertext ĐÃ kèm luôn
-16 byte tag ở cuối; decrypt sẽ tự tách và verify tag (sai → raise InvalidTag).
+Ported from Jack's modules/encryption.py (function aes_ed).
+Same primitives as the original: secrets.token_bytes for key and nonce,
+AESGCM from the cryptography library. Reshaped so that encryption and
+decryption are separate calls that work on raw bytes (files), with the
+key passed in from outside.
 """
 from __future__ import annotations
 
-import os
+import secrets
 
-KEY_SIZE = 32    # 256-bit
-NONCE_SIZE = 12  # 96-bit — kích thước nonce khuyến nghị cho GCM
-TAG_SIZE = 16    # 128-bit tag (đã nằm ở cuối ciphertext)
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+KEY_SIZE = 32    # 256 bit key
+NONCE_SIZE = 12  # 96 bit nonce, the recommended size for GCM
+TAG_SIZE = 16    # 128 bit tag, appended to the end of the ciphertext
 
 
 def generate_key() -> bytes:
-    """Sinh AES-256 key ngẫu nhiên (32 bytes)."""
-    # TODO: return os.urandom(KEY_SIZE)
-    raise NotImplementedError
+    """Return a random 32 byte AES key."""
+    return secrets.token_bytes(KEY_SIZE)
 
 
 def generate_nonce() -> bytes:
-    """Sinh nonce 12 byte ngẫu nhiên. KHÔNG dùng lại nonce với cùng 1 key."""
-    # TODO: return os.urandom(NONCE_SIZE)
-    raise NotImplementedError
+    """Return a random 12 byte nonce. Never reuse a nonce with the same key."""
+    return secrets.token_bytes(NONCE_SIZE)
 
 
 def encrypt(key: bytes, plaintext: bytes, aad: bytes = b"") -> tuple[bytes, bytes]:
-    """Mã hoá ``plaintext``.
+    """Encrypt plaintext with AES GCM.
 
-    Trả về ``(nonce, ciphertext)`` — trong đó ``ciphertext`` đã kèm tag ở cuối.
-    ``aad`` = associated data (không mã hoá nhưng được xác thực), tuỳ chọn.
+    Returns (nonce, ciphertext). The ciphertext already has the 16 byte
+    tag at the end. aad is optional associated data (checked, not encrypted).
     """
-    # TODO: nonce = generate_nonce(); ct = AESGCM(key).encrypt(nonce, plaintext, aad)
-    raise NotImplementedError
+    nonce = generate_nonce()
+    ciphertext = AESGCM(key).encrypt(nonce, plaintext, aad)
+    return nonce, ciphertext
 
 
 def decrypt(key: bytes, nonce: bytes, ciphertext: bytes, aad: bytes = b"") -> bytes:
-    """Giải mã + verify tag. Sai key / dữ liệu bị sửa → raise ``InvalidTag``."""
-    # TODO: return AESGCM(key).decrypt(nonce, ciphertext, aad)
-    raise NotImplementedError
+    """Decrypt and verify the tag. Wrong key or modified data raises InvalidTag."""
+    return AESGCM(key).decrypt(nonce, ciphertext, aad)
