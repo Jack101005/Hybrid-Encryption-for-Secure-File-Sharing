@@ -4,7 +4,6 @@ import pytest
 from hybridcrypto import aes_gcm, rsa_oaep
 
 
-@pytest.mark.skip(reason="chưa implement")
 def test_wrap_unwrap_roundtrip():
     priv, pub = rsa_oaep.generate_keypair(bits=2048)  # 2048 cho test chạy nhanh
     key = aes_gcm.generate_key()
@@ -12,7 +11,6 @@ def test_wrap_unwrap_roundtrip():
     assert rsa_oaep.unwrap_key(priv, wrapped) == key
 
 
-@pytest.mark.skip(reason="chưa implement")
 def test_wrong_private_key_fails():
     _, pub = rsa_oaep.generate_keypair(bits=2048)
     other_priv, _ = rsa_oaep.generate_keypair(bits=2048)

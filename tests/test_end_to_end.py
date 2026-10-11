@@ -7,7 +7,6 @@ import pytest
 from hybridcrypto import crypto, rsa_oaep
 
 
-@pytest.mark.skip(reason="chưa implement")
 def test_encrypt_then_decrypt(tmp_path):
     # chuẩn bị khoá
     priv, pub = rsa_oaep.generate_keypair(bits=2048)
@@ -28,7 +27,6 @@ def test_encrypt_then_decrypt(tmp_path):
     assert dec.read_bytes() == src.read_bytes()
 
 
-@pytest.mark.skip(reason="chưa implement")
 def test_tampered_file_fails(tmp_path):
     priv, pub = rsa_oaep.generate_keypair(bits=2048)
     priv_path = tmp_path / "private.pem"
