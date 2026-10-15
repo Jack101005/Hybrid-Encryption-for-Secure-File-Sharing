@@ -1,7 +1,7 @@
 import hashlib
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from keys.keyInfo import keyCompare
+from hybridcrypto.keyInfo import keyCompare
 import os
 def test_key_compare():
     
