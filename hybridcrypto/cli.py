@@ -7,22 +7,61 @@ Chạy:  python -m hybridcrypto.cli <lệnh> [tham số]
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+from pathlib import Path
+
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives import serialization
+
+from hybridcrypto import crypto, rsa_oaep
 
 
 def cmd_keygen(args: argparse.Namespace) -> None:
-    # TODO: rsa_oaep.generate_keypair(args.bits) → save public/private vào args.out
-    raise NotImplementedError
+    if args.bits < 2048:
+        raise ValueError("RSA key phải có kích thước ít nhất 2048 bits")
+
+    out_dir = Path(args.out)
+    pub_path = out_dir / "public.pem"
+    priv_path = out_dir / "private.pem"
+
+    # Never overwrite existing keys: if the old private key is lost,
+    # everything encrypted for it becomes unrecoverable.
+    for path in (pub_path, priv_path):
+        if path.exists():
+            raise FileExistsError(f"{path} đã tồn tại; hãy dùng --out directory khác, hoặc di chuyển các khóa cũ trước")
+
+    private_key, public_key = rsa_oaep.generate_keypair(args.bits)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    priv_path.write_bytes(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    try:
+        os.chmod(priv_path, 0o600)  # owner-only; limited effect on Windows
+    except OSError:
+        pass
+    pub_path.write_bytes(
+        public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    print(f"Các khóa đã lưu: {pub_path}, {priv_path}")
 
 
 def cmd_encrypt(args: argparse.Namespace) -> None:
-    # TODO: crypto.encrypt_file(args.inp, args.out, args.pubkey)
-    raise NotImplementedError
+    crypto.encrypt_file(args.inp, args.out, args.pubkey)
+    print(f"Encrypted {args.inp} -> {args.out}")
 
 
 def cmd_decrypt(args: argparse.Namespace) -> None:
-    # TODO: crypto.decrypt_file(args.inp, args.out, args.privkey)
-    raise NotImplementedError
+    crypto.decrypt_file(args.inp, args.out, args.privkey)
+    print(f"Decrypted {args.inp} -> {args.out}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,12 +91,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def fail(message: str) -> int:
+    print(f"Error: {message}", file=sys.stderr)
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except FileNotFoundError as e:
+        return fail(f"không tìm thấy file: {e.filename or e}")
+    except PermissionError as e:
+        return fail(f"không thể truy cập: {e.filename or e}")
+    except InvalidTag:
+        return fail("xác thực thất bại: sai khóa, hoặc tệp tin đã bị hỏng hoặc can thiệp")
+    except (ValueError, OSError) as e:
+        return fail(str(e))
+    except Exception as e:  # last resort: no raw tracebacks for users
+        return fail(f"unexpected {type(e).__name__}: {e}")
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
