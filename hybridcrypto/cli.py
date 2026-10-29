@@ -1,4 +1,4 @@
-"""Giao diện dòng lệnh: keygen / encrypt / decrypt.
+"""Giao diện dòng lệnh: keygen, encrypt, decrypt, sign, verify, fingerprint.
 
 [Mảng: CLI + File I/O]
 
@@ -13,7 +13,8 @@ from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
 
-from hybridcrypto import crypto, rsa_oaep
+from digitalSignature import signature
+from hybridcrypto import crypto, keyInfo, rsa_oaep
 
 
 def cmd_keygen(args: argparse.Namespace) -> None:
@@ -52,6 +53,33 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
     print(f"Decrypted {args.inp} -> {args.out}")
 
 
+def cmd_sign(args: argparse.Namespace) -> None:
+    sig_path = args.out or f"{args.inp}.sig"
+    private_key = rsa_oaep.load_private_key(args.privkey)
+    signature.sign_file(private_key, args.inp, sig_path)
+    print(f"Signed {args.inp} -> {sig_path}")
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    sig_path = args.sig or f"{args.inp}.sig"
+    public_key = rsa_oaep.load_public_key(args.pubkey)
+    if signature.verify_file(public_key, args.inp, sig_path):
+        print(f"Chữ ký hợp lệ: {args.inp} đúng là do chủ của {args.pubkey} ký, và không bị sửa")
+        return 0
+    return fail("chữ ký KHÔNG hợp lệ: file đã bị sửa, hoặc không phải do chủ public key này ký")
+
+
+def cmd_fingerprint(args: argparse.Namespace) -> int:
+    fp = keyInfo.fingerprint_file(args.pubkey)
+    print(fp)
+    if args.expect is None:
+        return 0
+    if keyInfo.keyCompare(args.pubkey, args.expect):
+        print("Fingerprint KHỚP: đây đúng là public key của người đó")
+        return 0
+    return fail("fingerprint KHÔNG khớp: public key này có thể đã bị tráo, đừng dùng nó")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hybridcrypto",
@@ -76,6 +104,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_dec.add_argument("--privkey", required=True, help="Private key (PEM)")
     p_dec.set_defaults(func=cmd_decrypt)
 
+    p_sign = sub.add_parser("sign", help="Ký 1 file bằng private key của người gửi")
+    p_sign.add_argument("--in", dest="inp", required=True, help="File cần ký")
+    p_sign.add_argument("--privkey", required=True, help="Private key của người gửi (PEM)")
+    p_sign.add_argument("--out", help="File chữ ký đầu ra (mặc định: <file>.sig)")
+    p_sign.set_defaults(func=cmd_sign)
+
+    p_ver = sub.add_parser("verify", help="Kiểm tra chữ ký của 1 file")
+    p_ver.add_argument("--in", dest="inp", required=True, help="File cần kiểm tra")
+    p_ver.add_argument("--pubkey", required=True, help="Public key của người gửi (PEM)")
+    p_ver.add_argument("--sig", help="File chữ ký (mặc định: <file>.sig)")
+    p_ver.set_defaults(func=cmd_verify)
+
+    p_fp = sub.add_parser("fingerprint", help="In fingerprint của public key, hoặc so với fingerprint mong đợi")
+    p_fp.add_argument("--pubkey", required=True, help="Public key (PEM)")
+    p_fp.add_argument("--expect", help="Fingerprint người kia đọc qua điện thoại, để so sánh")
+    p_fp.set_defaults(func=cmd_fingerprint)
+
     return parser
 
 
@@ -88,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        args.func(args)
+        rc = args.func(args)
     except FileNotFoundError as e:
         return fail(f"không tìm thấy file: {e.filename or e}")
     except PermissionError as e:
@@ -99,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         return fail(str(e))
     except Exception as e:  # last resort: no raw tracebacks for users
         return fail(f"unexpected {type(e).__name__}: {e}")
-    return 0
+    return rc or 0
 
 
 if __name__ == "__main__":
