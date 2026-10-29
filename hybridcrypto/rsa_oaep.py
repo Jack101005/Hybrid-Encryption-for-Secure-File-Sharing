@@ -74,4 +74,8 @@ def wrap_key(public_key, aes_key: bytes) -> bytes:
 
 def unwrap_key(private_key, wrapped: bytes) -> bytes:
     """Mo AES key bang private key (RSA-OAEP). Tra ve AES key goc."""
-    return private_key.decrypt(wrapped, _OAEP)
+    try:
+        return private_key.decrypt(wrapped, _OAEP)
+    except ValueError as e:
+        raise ValueError("không mở được khoá AES: private key này không phải của người nhận, "
+                         "hoặc phần khoá bọc trong file đã bị sửa") from e

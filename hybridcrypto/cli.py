@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives import serialization
 
 from hybridcrypto import crypto, rsa_oaep
 
@@ -34,23 +33,12 @@ def cmd_keygen(args: argparse.Namespace) -> None:
     private_key, public_key = rsa_oaep.generate_keypair(args.bits)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    priv_path.write_bytes(
-        private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-    )
+    rsa_oaep.save_private_key(private_key, priv_path)
     try:
         os.chmod(priv_path, 0o600)  # owner-only; limited effect on Windows
     except OSError:
         pass
-    pub_path.write_bytes(
-        public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-    )
+    rsa_oaep.save_public_key(public_key, pub_path)
     print(f"Các khóa đã lưu: {pub_path}, {priv_path}")
 
 
@@ -106,9 +94,13 @@ def main(argv: list[str] | None = None) -> int:
     except PermissionError as e:
         return fail(f"không thể truy cập: {e.filename or e}")
     except InvalidTag:
-        return fail("xác thực thất bại: sai khóa, hoặc tệp tin đã bị hỏng hoặc can thiệp")
+        return fail("xác thực thất bại: file .hyb đã bị sửa hoặc bị hỏng")
     except (ValueError, OSError) as e:
         return fail(str(e))
     except Exception as e:  # last resort: no raw tracebacks for users
         return fail(f"unexpected {type(e).__name__}: {e}")
     return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
